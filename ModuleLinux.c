@@ -1,26 +1,26 @@
-/* Подключение заголовочных файлов. ? */
-#include <linux/module.h> /* Содержит функции и определения для динамической загрузки модулей ядра */
-#include <linux/init.h>  /* Указывает на функции инициализации и очистки */
-#include <linux/fs.h>    /* Содержит функции регистрации и удаления драйвера */
-#include <linux/cdev.h>  /* Содержит необходимые функции для символьного драйвера */
-#include <linux/slab.h>  /* Содержит функцию ядра для управления памятью */
-#include <asm/uaccess.h> /* Предоставляет доступ к пространству пользователя */
+/* РџРѕРґРєР»СЋС‡РµРЅРёРµ Р·Р°РіРѕР»РѕРІРѕС‡РЅС‹С… С„Р°Р№Р»РѕРІ. в–ј */
+#include <linux/module.h> /* РЎРѕРґРµСЂР¶РёС‚ С„СѓРЅРєС†РёРё Рё РѕРїСЂРµРґРµР»РµРЅРёСЏ РґР»СЏ РґРёРЅР°РјРёС‡РµСЃРєРѕР№ Р·Р°РіСЂСѓР·РєРё РјРѕРґСѓР»РµР№ СЏРґСЂР° */
+#include <linux/init.h>  /* РЈРєР°Р·С‹РІР°РµС‚ РЅР° С„СѓРЅРєС†РёРё РёРЅРёС†РёР°Р»РёР·Р°С†РёРё Рё РѕС‡РёСЃС‚РєРё */
+#include <linux/fs.h>    /* РЎРѕРґРµСЂР¶РёС‚ С„СѓРЅРєС†РёРё СЂРµРіРёСЃС‚СЂР°С†РёРё Рё СѓРґР°Р»РµРЅРёСЏ РґСЂР°Р№РІРµСЂР° */
+#include <linux/cdev.h>  /* РЎРѕРґРµСЂР¶РёС‚ РЅРµРѕР±С…РѕРґРёРјС‹Рµ С„СѓРЅРєС†РёРё РґР»СЏ СЃРёРјРІРѕР»СЊРЅРѕРіРѕ РґСЂР°Р№РІРµСЂР° */
+#include <linux/slab.h>  /* РЎРѕРґРµСЂР¶РёС‚ С„СѓРЅРєС†РёСЋ СЏРґСЂР° РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ РїР°РјСЏС‚СЊСЋ */
+#include <asm/uaccess.h> /* РџСЂРµРґРѕСЃС‚Р°РІР»СЏРµС‚ РґРѕСЃС‚СѓРї Рє РїСЂРѕСЃС‚СЂР°РЅСЃС‚РІСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ */
 
-/* Базовая информация об устройстве. ? */
+/* Р‘Р°Р·РѕРІР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ РѕР± СѓСЃС‚СЂРѕР№СЃС‚РІРµ. в–ј */
 
-int scull_major = 0;	/*Старший номер*/
-int scull_minor = 0;	/*Младший номер*/
+int scull_major = 0;	/*РЎС‚Р°СЂС€РёР№ РЅРѕРјРµСЂ*/
+int scull_minor = 0;	/*РњР»Р°РґС€РёР№ РЅРѕРјРµСЂ*/
 int scull_nr_devs = 1;	/**/
-int scull_quantum = 4000;	/*Кол-во передаваимых квантов*/
+int scull_quantum = 4000;	/*РљРѕР»-РІРѕ РїРµСЂРµРґР°РІР°РёРјС‹С… РєРІР°РЅС‚РѕРІ*/
 int scull_qset = 1000;	
 /*_________________________________________________________________________________________________________________________________________*/
 
-struct scull_qset {   /* Устройство будет представлять связный список указателей, каждый из которых указывает на структуру scull_qset.*/
+struct scull_qset {   /* РЈСЃС‚СЂРѕР№СЃС‚РІРѕ Р±СѓРґРµС‚ РїСЂРµРґСЃС‚Р°РІР»СЏС‚СЊ СЃРІСЏР·РЅС‹Р№ СЃРїРёСЃРѕРє СѓРєР°Р·Р°С‚РµР»РµР№, РєР°Р¶РґС‹Р№ РёР· РєРѕС‚РѕСЂС‹С… СѓРєР°Р·С‹РІР°РµС‚ РЅР° СЃС‚СЂСѓРєС‚СѓСЂСѓ scull_qset.*/
 	void **data;			
 	struct scull_qset *next; 	
 };
 
-struct scull_dev {    /* Драйвер представляет каждое символьное устройство структурой scull_dev, а также предостовляет интерфейс cdev к ядру.*/
+struct scull_dev {    /* Р”СЂР°Р№РІРµСЂ РїСЂРµРґСЃС‚Р°РІР»СЏРµС‚ РєР°Р¶РґРѕРµ СЃРёРјРІРѕР»СЊРЅРѕРµ СѓСЃС‚СЂРѕР№СЃС‚РІРѕ СЃС‚СЂСѓРєС‚СѓСЂРѕР№ scull_dev, Р° С‚Р°РєР¶Рµ РїСЂРµРґРѕСЃС‚РѕРІР»СЏРµС‚ РёРЅС‚РµСЂС„РµР№СЃ cdev Рє СЏРґСЂСѓ.*/
 	struct scull_qset *data;  
 	int quantum;		 
 	int qset;		  
@@ -32,7 +32,7 @@ struct scull_dev {    /* Драйвер представляет каждое символьное устройство струк
 
 struct scull_dev *scull_device;
 
-int scull_trim(struct scull_dev *dev)	/*проходим по списку и возвращаем память ядру*/
+int scull_trim(struct scull_dev *dev)	/*РїСЂРѕС…РѕРґРёРј РїРѕ СЃРїРёСЃРєСѓ Рё РІРѕР·РІСЂР°С‰Р°РµРј РїР°РјСЏС‚СЊ СЏРґСЂСѓ*/
 {
 	struct scull_qset *next, *dptr;
 	int qset = dev->qset; 
@@ -59,7 +59,7 @@ int scull_trim(struct scull_dev *dev)	/*проходим по списку и возвращаем память я
 	return 0;
 }
 
-struct file_operations scull_fops = {/*Устанавливаем связь между номерами: MAJOR, MINOR и операциями драйвера. Это можно сделать используя структуру file_operations.*/
+struct file_operations scull_fops = {/*РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЃРІСЏР·СЊ РјРµР¶РґСѓ РЅРѕРјРµСЂР°РјРё: MAJOR, MINOR Рё РѕРїРµСЂР°С†РёСЏРјРё РґСЂР°Р№РІРµСЂР°. Р­С‚Рѕ РјРѕР¶РЅРѕ СЃРґРµР»Р°С‚СЊ РёСЃРїРѕР»СЊР·СѓСЏ СЃС‚СЂСѓРєС‚СѓСЂСѓ file_operations.*/
 	.owner = THIS_MODULE,			
 	//.read = scull_read,
 	.write = scull_write,
@@ -67,7 +67,7 @@ struct file_operations scull_fops = {/*Устанавливаем связь между номерами: MAJOR
 	.release = scull_release,
 };
 
-static void scull_setup_cdev(struct scull_dev *dev, int index)	/*начинаем установку в ядро*/
+static void scull_setup_cdev(struct scull_dev *dev, int index)	/*РЅР°С‡РёРЅР°РµРј СѓСЃС‚Р°РЅРѕРІРєСѓ РІ СЏРґСЂРѕ*/
 {
 	int err, devno = MKDEV(scull_major, scull_minor + index);	
 
@@ -82,7 +82,7 @@ static void scull_setup_cdev(struct scull_dev *dev, int index)	/*начинаем устано
 		printk(KERN_NOTICE "Error %d adding scull  %d", err, index);
 }
 
-void scull_cleanup_module(void) /*Функция scull_cleanup_module вызывается при удалении модуля устройства из ядра. ?*/
+void scull_cleanup_module(void) /*Р¤СѓРЅРєС†РёСЏ scull_cleanup_module РІС‹Р·С‹РІР°РµС‚СЃСЏ РїСЂРё СѓРґР°Р»РµРЅРёРё РјРѕРґСѓР»СЏ СѓСЃС‚СЂРѕР№СЃС‚РІР° РёР· СЏРґСЂР°. в–ј*/
 {
 	int i;
 	dev_t devno = MKDEV(scull_major, scull_minor);
@@ -95,25 +95,25 @@ void scull_cleanup_module(void) /*Функция scull_cleanup_module вызывается при уд
 		
 		kfree(scull_device);
 	}
-    printk(KERN_INFO “Work is Over”);
+    printk(KERN_INFO вЂњWork is OverвЂќ);
 	unregister_chrdev_region(devno, scull_nr_devs); 
 }
 
-/*Функция иницилизация устройства ?*/
+/*Р¤СѓРЅРєС†РёСЏ РёРЅРёС†РёР»РёР·Р°С†РёСЏ СѓСЃС‚СЂРѕР№СЃС‚РІР° в–ј*/
 static int scull_init_module(void)
 {
 	int rv, i;
 	dev_t dev;
 
 		
-	rv = alloc_chrdev_region(&dev, scull_minor, scull_nr_devs, "scull");	/*Вызывая alloc_chrdev_region мы регистрируем диапазон символьных номеров устройств и указываем имя устройства*/
+	rv = alloc_chrdev_region(&dev, scull_minor, scull_nr_devs, "scull");	/*Р’С‹Р·С‹РІР°СЏ alloc_chrdev_region РјС‹ СЂРµРіРёСЃС‚СЂРёСЂСѓРµРј РґРёР°РїР°Р·РѕРЅ СЃРёРјРІРѕР»СЊРЅС‹С… РЅРѕРјРµСЂРѕРІ СѓСЃС‚СЂРѕР№СЃС‚РІ Рё СѓРєР°Р·С‹РІР°РµРј РёРјСЏ СѓСЃС‚СЂРѕР№СЃС‚РІР°*/
 
 	if (rv) {
-		printk(KERN_WARNING "error, can't get major %d\n", scull_major); /*Если вернувшееся значение не является кодом ошибки, продолжаем выполнять иницилизацию.*/
+		printk(KERN_WARNING "error, can't get major %d\n", scull_major); /*Р•СЃР»Рё РІРµСЂРЅСѓРІС€РµРµСЃСЏ Р·РЅР°С‡РµРЅРёРµ РЅРµ СЏРІР»СЏРµС‚СЃСЏ РєРѕРґРѕРј РѕС€РёР±РєРё, РїСЂРѕРґРѕР»Р¶Р°РµРј РІС‹РїРѕР»РЅСЏС‚СЊ РёРЅРёС†РёР»РёР·Р°С†РёСЋ.*/
 		return rv;
 	}
 
-        scull_major = MAJOR(dev);       /*Вызовом MAJOR(dev) мы получаем старший номер*/
+        scull_major = MAJOR(dev);       /*Р’С‹Р·РѕРІРѕРј MAJOR(dev) РјС‹ РїРѕР»СѓС‡Р°РµРј СЃС‚Р°СЂС€РёР№ РЅРѕРјРµСЂ*/
 
 	scull_device = kmalloc(scull_nr_devs * sizeof(struct scull_dev), GFP_KERNEL);	
 	
@@ -124,14 +124,14 @@ static int scull_init_module(void)
 
 	memset(scull_device, 0, scull_nr_devs * sizeof(struct scull_dev));		
 
-	for (i = 0; i < scull_nr_devs; i++) {	/*Функция scull_setup_cdev выполняет инициализацию и добавление структуры в систему.*/					
+	for (i = 0; i < scull_nr_devs; i++) {	/*Р¤СѓРЅРєС†РёСЏ scull_setup_cdev РІС‹РїРѕР»РЅСЏРµС‚ РёРЅРёС†РёР°Р»РёР·Р°С†РёСЋ Рё РґРѕР±Р°РІР»РµРЅРёРµ СЃС‚СЂСѓРєС‚СѓСЂС‹ РІ СЃРёСЃС‚РµРјСѓ.*/					
 		scull_device[i].quantum = scull_quantum;
 		scull_device[i].qset = scull_qset;
 		sema_init(&scull_device[i].sem, 1);
 		scull_setup_cdev(&scull_device[i], i);					
 	}
 
-	dev = MKDEV(scull_major, scull_minor + scull_nr_devs);	/*MKDEV служит для хранения старший и младших номеров устройств.*/
+	dev = MKDEV(scull_major, scull_minor + scull_nr_devs);	/*MKDEV СЃР»СѓР¶РёС‚ РґР»СЏ С…СЂР°РЅРµРЅРёСЏ СЃС‚Р°СЂС€РёР№ Рё РјР»Р°РґС€РёС… РЅРѕРјРµСЂРѕРІ СѓСЃС‚СЂРѕР№СЃС‚РІ.*/
 	
 	printk(KERN_INFO "major = %d minor = %d\n", scull_major, scull_minor);
 
@@ -141,7 +141,7 @@ fail:
 	scull_cleanup_module();
 	return rv;
 }
-#define DEVICE_NAME “my_dummy_device”
+#define DEVICE_NAME вЂњmy_dummy_deviceвЂќ
 MODULE_AUTHOR("Andrey Ilin");
 MODULE_LICENSE("GPL");
 
